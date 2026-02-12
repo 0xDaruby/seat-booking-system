@@ -1,0 +1,19 @@
+/* Reset default margins */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Ensure full height */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/* Optional smooth rendering */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
