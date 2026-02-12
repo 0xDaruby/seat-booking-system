@@ -1,78 +1,78 @@
-<<<<<<< HEAD
-# seat-booking-system
-A modern event seat booking system built with React, Zustand, and Tailwind CSS. Features include real-time seat selection, payment confirmation flow, ticket generation (PNG/PDF), and an admin dashboard with protected routes.
-=======
-# React + TypeScript + Vite
+🎟️ Seat Booking System
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Welcome to the Seat Booking System!
+This project is a modern event seat reservation platform that allows users to select seats, complete payments, and generate downloadable digital tickets. It also includes an admin dashboard for managing bookings and monitoring seat availability in real time.
 
-Currently, two official plugins are available:
+Feel free to explore the project structure and features.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+🚀 Technologies Used
 
-## React Compiler
+React.js – A powerful JavaScript library for building user interfaces.
 
-The React Compiler is currently not compatible with SWC. See [this issue](https://github.com/vitejs/vite-plugin-react/issues/428) for tracking the progress.
+TypeScript – Strongly typed JavaScript for scalable development.
 
-## Expanding the ESLint configuration
+Tailwind CSS – Utility-first CSS framework for modern UI styling.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+React Router – Handles client-side routing and navigation.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+Zustand – Lightweight global state management.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+html2canvas – Converts ticket UI into downloadable images.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+jsPDF – Generates downloadable PDF tickets.
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Material Icons – Used for consistent UI iconography.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+✨ Features
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
->>>>>>> 355742a (Initial commit - Seat Booking System)
+Seat Selection System – Interactive 10x10 seat grid with availability status.
+
+Payment Flow (Mock Integration) – Payment confirmation before ticket issuance.
+
+Profile Upload – Users upload a profile image for their digital ticket.
+
+Downloadable Ticket – Export ticket as PNG or PDF.
+
+Admin Dashboard
+
+🛠 Installation and Setup
+1️⃣ Fork or Clone
+https://github.com/0xDaruby/seat-booking-system.git
+
+2️⃣ Navigate into the Project
+cd seat-booking-system
+
+3️⃣ Install Dependencies
+npm install
+
+4️⃣ Run Development Server
+npm run dev
+
+
+Open your browser and visit:
+
+http://localhost:5173
+
+📌 Usage
+
+This project can be used as:
+
+A foundation for real event booking systems
+
+A portfolio project demonstrating frontend architecture
+
+A base system for integrating Paystack
+
+📬 Contact
+
+If you have any questions or would like to collaborate:
+
+GitHub: https://github.com/0xDaruby
+
+Email: iquaibomdavid@gmail.com
+
+🧠 Notes
+
+This system was built as a scalable foundation for a real-world event booking platform.
+
+Continuous improvements and updates are planned.
