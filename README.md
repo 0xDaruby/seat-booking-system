@@ -1,11 +1,11 @@
-🎟️ Seat Booking System
+# Seat Booking System 🎟️
 
 Welcome to the Seat Booking System!
 This project is a modern event seat reservation platform that allows users to select seats, complete payments, and generate downloadable digital tickets. It also includes an admin dashboard for managing bookings and monitoring seat availability in real time.
 
 Feel free to explore the project structure and features.
 
-🚀 Technologies Used
+## Technologies Used
 
 React.js – A powerful JavaScript library for building user interfaces.
 
@@ -23,7 +23,7 @@ jsPDF – Generates downloadable PDF tickets.
 
 Material Icons – Used for consistent UI iconography.
 
-✨ Features
+## Features
 
 Seat Selection System – Interactive 10x10 seat grid with availability status.
 
@@ -35,7 +35,8 @@ Downloadable Ticket – Export ticket as PNG or PDF.
 
 Admin Dashboard
 
-🛠 Installation and Setup
+## Installation and Setup
+
 1️⃣ Fork or Clone
 https://github.com/0xDaruby/seat-booking-system.git
 
@@ -53,7 +54,7 @@ Open your browser and visit:
 
 http://localhost:5173
 
-📌 Usage
+## Usage
 
 This project can be used as:
 
@@ -63,7 +64,7 @@ A portfolio project demonstrating frontend architecture
 
 A base system for integrating Paystack
 
-📬 Contact
+## Contact
 
 If you have any questions or would like to collaborate:
 
@@ -71,7 +72,7 @@ GitHub: https://github.com/0xDaruby
 
 Email: iquaibomdavid@gmail.com
 
-🧠 Notes
+## Notes
 
 This system was built as a scalable foundation for a real-world event booking platform.
 
