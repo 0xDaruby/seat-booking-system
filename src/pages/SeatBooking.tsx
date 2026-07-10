@@ -450,7 +450,7 @@ export default function SeatBooking() {
               <h1 className="sb-brand-title sb-display">
                 MY HIGHS &amp; <span>I</span>
               </h1>
-              <p className="sb-brand-sub">Live booking experience</p>
+              <p className="sb-brand-sub">Life Changing experience</p>
             </div>
           </div>
 

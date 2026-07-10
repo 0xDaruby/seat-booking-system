@@ -273,9 +273,8 @@ export default function AdminLogin() {
               </div>
               <div className="al-brand-copy">
                 <h1 className="al-display">
-                  SeatAdmin <span>Portal</span>
-                </h1>
-                <p>Lemon Noir control layer</p>
+                  MHAI Admin <span>Portal</span>
+                </h1>            
               </div>
             </div>
 
@@ -285,35 +284,11 @@ export default function AdminLogin() {
 
             <div className="al-hero-copy">
               <h2 className="al-display">
-                Manage bookings, payment flow, and seat inventory from one premium control surface.
+                Manage bookings and seat inventory.
               </h2>
               <p>
-                This admin entry point mirrors the public booking flow's Lemon Noir system, with a
-                more controlled, trust-first, dashboard tone for day-to-day operations.
+                This admin entry point is for authorized personnel only. It provides a secure, encrypted session for monitoring reservations, releasing seats, and reviewing payment states.
               </p>
-            </div>
-
-            <div className="al-feature-grid">
-              <div className="al-feature">
-                <p className="al-t">Seat control</p>
-                <p className="al-k al-display">100 Seats</p>
-                <p className="al-d">Monitor availability, booked seats, and pending reservations from the same system.</p>
-              </div>
-              <div className="al-feature">
-                <p className="al-t">Payment oversight</p>
-                <p className="al-k al-display">Live status</p>
-                <p className="al-d">Review reservation states, payment references, and release seats when needed.</p>
-              </div>
-              <div className="al-feature">
-                <p className="al-t">Brand consistency</p>
-                <p className="al-k al-display">Lemon Noir</p>
-                <p className="al-d">Keeps the admin experience visually aligned with the public-facing booking flow.</p>
-              </div>
-              <div className="al-feature">
-                <p className="al-t">Security layer</p>
-                <p className="al-k al-display">Encrypted</p>
-                <p className="al-d">A private, system-level tone with controlled glass panels and restrained accent usage.</p>
-              </div>
             </div>
           </div>
 
@@ -463,8 +438,7 @@ export default function AdminLogin() {
                 </svg>
                 <div>
                   <strong>Secure session notice</strong>
-                  Admin access is treated as a premium system entry point rather than a generic form
-                  screen, staying visually aligned with the public booking experience.
+                  Admin access is treated as a crutial system entry point for just authorised administrators.
                 </div>
               </div>
 

@@ -50,7 +50,7 @@ export default function Payment() {
   const confirmBooking = useStore((s) => s.confirmBooking);
   const releaseSeat = useStore((s) => s.releaseSeat);
 
-  const eventName = "EventBookingPro";
+  const eventName = "My Highs & I";
   const ticketPriceNgn = 2000;
 
   const referenceRef = useRef(`EBP-${Date.now()}`);
@@ -446,9 +446,8 @@ export default function Payment() {
               </div>
               <div className="pm-brand-copy">
                 <h2 className="pm-display">
-                  Event<span>Booking</span>Pro
+                  My Highs &<span> I</span>
                 </h2>
-                <p>Lemon Noir checkout flow</p>
               </div>
             </div>
             <div className="pm-step">
@@ -571,7 +570,7 @@ export default function Payment() {
             <div className="pm-line">
               <div>
                 <p className="pm-l">Service fee</p>
-                <p className="pm-v pm-display">Booking protection</p>
+                <p className="pm-v pm-display"></p>
                 <p className="pm-m">No additional charge</p>
               </div>
               <div className="pm-amount">₦0</div>

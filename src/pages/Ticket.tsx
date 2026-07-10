@@ -144,7 +144,7 @@ export default function Ticket() {
                 <rect x="3" y="5" width="18" height="16" rx="3" />
                 <path d="M8 3v4M16 3v4M3 10h18" />
               </svg>
-              <span>28TH FEB &bull; 10:00 AM</span>
+              <span>August &bull; 10:00 AM</span>
             </div>
           </div>
 
