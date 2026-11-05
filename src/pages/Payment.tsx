@@ -66,6 +66,7 @@ export default function Payment() {
 
   // Re-entrancy guard so a double click/tap can't open two Paystack
   // popups, plus inline (non-blocking) status messaging.
+
   const [isPaying, setIsPaying] = useState(false);
   const [paymentNote, setPaymentNote] = useState<string | null>(null);
   const [paymentError, setPaymentError] = useState<string | null>(null);
@@ -74,6 +75,15 @@ export default function Payment() {
   const [secondsLeft, setSecondsLeft] = useState(RESERVATION_SECONDS);
   const [isExpired, setIsExpired] = useState(false);
   const hasReleasedRef = useRef(false);
+
+  // If this booking was already confirmed (e.g. user navigated back
+  // to /payment after a successful payment), don't let them attempt
+  // to pay again — send them straight to their ticket.
+  useEffect(() => {
+    if (paymentReference) {
+      navigate("/ticket", { replace: true });
+    }
+  }, [paymentReference, navigate]);
 
   const handlePay = () => {
     if (isPaying || isExpired) return;
@@ -316,7 +326,7 @@ export default function Payment() {
         .pm-progress-top { display: flex; justify-content: space-between; align-items: center; gap: 14px; margin-bottom: 10px; flex-wrap: wrap; }
         .pm-progress-top p { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--pm-text-faint); font-weight: 700; }
         .pm-track { height: 10px; border-radius: 999px; background: rgba(255,255,255,.05); overflow: hidden; border: 1px solid rgba(255,255,255,.04); }
-        .pm-fill { height: 100%; width: 66%; background: linear-gradient(90deg,#E8FB73 0%, var(--pm-accent) 55%, #B5D61F 100%); }
+        .pm-fill { height: 100%; background: linear-gradient(90deg,#E8FB73 0%, var(--pm-accent) 55%, #B5D61F 100%); }
 
         .pm-booking-card {
           padding: 26px; border-radius: 24px; background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.025));
@@ -473,7 +483,7 @@ export default function Payment() {
               <p>Seat selected → payment → ticket issued</p>
             </div>
             <div className="pm-track">
-              <div className="pm-fill" />
+              <div className="pm-fill" style={{ width: `${progressPct}%` }} />
             </div>
           </div>
 
