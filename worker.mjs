@@ -15,8 +15,8 @@ const configurationErrors = new Map([
   ["Invalid booking origin", "booking_origin"],
 ]);
 
-function bookingOrigin(env) {
-  const { BOOKING_MODE: mode, BOOKING_ORIGIN: configured } = env;
+function bookingOrigin(env, configured = env.BOOKING_ORIGIN) {
+  const { BOOKING_MODE: mode } = env;
   const { origin, protocol, hostname } = new URL(configured);
   const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(hostname);
   const validOrigin = mode === "preview" ? protocol === "http:" && loopback : protocol === "https:" && !loopback;
@@ -49,7 +49,28 @@ export default {
     try {
       const origin = bookingOrigin(env);
       const url = new URL(request.url);
-      if (url.origin !== origin) return deny(apiHeaders(), 421, "Booking is unavailable on this address.");
+      const adminOrigin = env.BOOKING_ADMIN_ORIGIN && bookingOrigin(env, env.BOOKING_ADMIN_ORIGIN);
+      const legacyOrigin = env.BOOKING_LEGACY_ORIGIN && bookingOrigin(env, env.BOOKING_LEGACY_ORIGIN);
+      const wwwOrigin = env.BOOKING_WWW_ORIGIN && bookingOrigin(env, env.BOOKING_WWW_ORIGIN);
+      const navigation = request.method === "GET" || request.method === "HEAD";
+      if (url.origin === wwwOrigin && navigation) {
+        return new Response(null, { status: 308, headers: {
+          location: origin + url.pathname + url.search, "cache-control": "no-store",
+        } });
+      }
+      if (![origin, adminOrigin, legacyOrigin].includes(url.origin)) {
+        return deny(apiHeaders(), 421, "Booking is unavailable on this address.");
+      }
+      if (url.origin === adminOrigin) {
+        if (url.pathname === "/" && navigation) {
+          return new Response(null, { status: 302, headers: {
+            location: adminOrigin + "/admin-login", "cache-control": "no-store",
+          } });
+        }
+        if ((url.pathname === "/api" || url.pathname.startsWith("/api/")) && !url.pathname.startsWith("/api/admin/")) {
+          return deny(apiHeaders(), 404, "Not found.");
+        }
+      }
       if (url.pathname !== "/api" && !url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
       if (url.pathname !== "/api/paystack/webhook" && env.API_RATE && env.CHECKOUT_RATE) {
         const client = digest(request.headers.get("cf-connecting-ip") ?? "unknown");
@@ -58,7 +79,9 @@ export default {
           return deny(apiHeaders(), 429, "Too many requests. Please try again shortly.");
         }
       }
-      const api = await bookingApi(env, origin);
+      // Retain each approved host's session cookies and same-origin checks,
+      // including payment returns and webhooks on the original workers.dev URL.
+      const api = await bookingApi(env, url.origin);
       return await api.fetch(request);
     } catch (error) {
       // Only fixed diagnostic codes enter logs. Secret values, request bodies,

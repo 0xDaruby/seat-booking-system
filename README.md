@@ -2,7 +2,7 @@
 
 Seat booking, Paystack checkout, and downloadable tickets for **My Highs & I — The Life You Offer**.
 
-[Live website](https://series-004.edaraiquaibom16.workers.dev/) · [Deployment guide](DEPLOYMENT.md)
+[Live website](https://myhighsandi.me/) · [Organizer sign-in](https://admin.myhighsandi.me/) · [Deployment guide](DEPLOYMENT.md)
 
 ## Event
 

@@ -1,6 +1,8 @@
 # Production deployments
 
-Production runs at https://series-004.edaraiquaibom16.workers.dev/ on the Cloudflare Worker `series-004`.
+Production runs at https://myhighsandi.me/ on the Cloudflare Worker `series-004`. Organizer sign-in is available at https://admin.myhighsandi.me/; the subdomain opens `/admin-login` and keeps organizer requests on that origin. The `www` hostname redirects to the main domain.
+
+The original https://series-004.edaraiquaibom16.workers.dev/ address remains available for existing browser sessions, payment returns, and Paystack webhook delivery. New bookings made on the main domain return to that same domain after payment.
 
 Cloudflare Workers Builds is connected to `0xDaruby/seat-booking-system`, with `main` as the production branch. A push to `main` automatically installs dependencies, runs the checks, builds the frontend, and deploys the Worker and assets. Local edits appear online after they are committed, pushed, and successfully deployed.
 
@@ -35,3 +37,9 @@ Runtime secrets remain in Cloudflare. Do not commit `.env`, `.dev.vars`, `.booki
 Deploying application code does not apply SQL migrations. If a future change needs a database migration, review its compatibility with existing bookings and apply it as a separate release step. Preserve booking records when rolling back application code.
 
 The clean Series 004 application replaced the old files on `main` in commit `9059eec`. Earlier commits remain in Git history; use the current source for builds.
+
+## Custom domain
+
+`myhighsandi.me` remains registered at Namecheap and uses Cloudflare nameservers `molly.ns.cloudflare.com` and `yichun.ns.cloudflare.com`. Cloudflare manages DNS and HTTPS for the root, `www`, and `admin` hostnames. The application source remains in `0xDaruby/seat-booking-system`; the separate `0xDaruby.github.io` repository created by the domain offer is not the booking application.
+
+The production custom-domain routes and approved origins are versioned in `wrangler.jsonc`. The Worker handles hostname routing before static assets, rejects unapproved hosts, and keeps organizer cookies scoped to their host. Database bindings and runtime payment secrets are shared with the existing production deployment.

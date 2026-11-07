@@ -8,6 +8,46 @@ import { localBinding } from "./d1-binding.mjs";
 
 const origin = "http://127.0.0.1:8791";
 
+test("custom domains keep booking and organizer requests on their own approved origins", async (t) => {
+  const { env, key } = runtime(t);
+  const main = "https://myhighsandi.me";
+  const admin = "https://admin.myhighsandi.me";
+  const legacy = "https://series-004.edaraiquaibom16.workers.dev";
+  Object.assign(env, {
+    BOOKING_MODE: "test", PAYSTACK_SECRET_KEY: "sk_test_fixture",
+    BOOKING_ORIGIN: main, BOOKING_ADMIN_ORIGIN: admin,
+    BOOKING_LEGACY_ORIGIN: legacy, BOOKING_WWW_ORIGIN: "https://www.myhighsandi.me",
+  });
+  const request = (base, path, data, caller = base, cookie) => worker.fetch(new Request(base + path, {
+    ...(data && { method: "POST", body: JSON.stringify(data),
+      headers: { "content-type": "application/json", origin: caller, ...(cookie && { cookie }) } }),
+  }), env);
+  for (const base of [main, legacy]) {
+    assert.equal((await request(base, "/api/seats")).status, 200);
+    assert.equal(await (await request(base, "/payment?reference=fixture")).text(), "/payment");
+  }
+  const landing = await request(admin, "/");
+  assert.equal(landing.status, 302);
+  assert.equal(landing.headers.get("location"), admin + "/admin-login");
+  assert.equal(await (await request(admin, "/admin-login")).text(), "/admin-login");
+  assert.equal(await (await request(admin, "/assets/app.js")).text(), "/assets/app.js");
+  assert.equal((await request(admin, "/api/seats")).status, 404);
+  assert.equal((await request(admin, "/api/checkout", {})).status, 404);
+  assert.equal((await request(admin, "/api/admin/records")).status, 401);
+  const login = await request(admin, "/api/admin/login", { username: "rehearsal", password: key });
+  assert.equal(login.status, 200);
+  assert.match(login.headers.get("set-cookie"), /HttpOnly; SameSite=Strict; Path=\/api; Max-Age=3600; Secure/);
+  assert.doesNotMatch(login.headers.get("set-cookie"), /Domain=/i);
+  const cookie = login.headers.get("set-cookie").split(";")[0];
+  assert.equal((await request(admin, "/api/admin/checkout", { paused: true }, main, cookie)).status, 403);
+  assert.equal((await request("https://myhighsandi.me.evil.example", "/api/seats")).status, 421);
+  const www = await request("https://www.myhighsandi.me", "//evil.example/payment?return=1");
+  assert.equal(www.status, 308);
+  assert.equal(www.headers.get("location"), main + "//evil.example/payment?return=1");
+  assert.equal((await request("https://www.myhighsandi.me", "/api/admin/login", {})).status, 421);
+  assert.equal((await request(legacy, "/api/paystack/webhook", {})).status, 401);
+});
+
 function runtime(t) {
   const { db, sqlite } = localBinding(t);
   const key = token();
