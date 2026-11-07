@@ -38,6 +38,14 @@ Deploying application code does not apply SQL migrations. If a future change nee
 
 The clean Series 004 application replaced the old files on `main` in commit `9059eec`. Earlier commits remain in Git history; use the current source for builds.
 
+## Pay with OPay
+
+The production checkout channel list includes `bank` alongside `card` and `bank_transfer`. Paystack provides OPay through its Bank channel; there is no separate `opay` channel value.
+
+Enable **Bank** in the Paystack Dashboard under **Settings > Preferences** for the intended business. Customers then select **Bank > OPay Digital Services Limited (OPay)** in hosted checkout and authenticate through OPay. See [Paystack's OPay guide](https://paystack.com/blog/product-engineering/pay-with-opay).
+
+The configuration change takes effect after deployment. Verify OPay is offered in a fresh checkout after enabling Bank in Paystack; existing checkout sessions may retain their previous channels.
+
 ## Custom domain
 
 `myhighsandi.me` remains registered at Namecheap and uses Cloudflare nameservers `molly.ns.cloudflare.com` and `yichun.ns.cloudflare.com`. Cloudflare manages DNS and HTTPS for the root, `www`, and `admin` hostnames. The application source remains in `0xDaruby/seat-booking-system`; the separate `0xDaruby.github.io` repository created by the domain offer is not the booking application.

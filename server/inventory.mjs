@@ -36,16 +36,22 @@ export function openInventory(path) {
       note TEXT NOT NULL, actor TEXT NOT NULL, at INTEGER NOT NULL
     );
   `);
-  if (!db.prepare("PRAGMA table_info(attempts)").all().some(column => column.name === "referralCode")) {
+  function migrate(name) {
     db.exec("BEGIN IMMEDIATE");
     try {
-      db.exec(readFileSync(new URL("../migrations/0002_referrals.sql", import.meta.url), "utf8"));
+      db.exec(readFileSync(new URL("../migrations/" + name, import.meta.url), "utf8"));
       db.exec("COMMIT");
     } catch (error) {
       db.exec("ROLLBACK");
       db.close();
       throw error;
     }
+  }
+  if (!db.prepare("PRAGMA table_info(attempts)").all().some(column => column.name === "referralCode")) {
+    migrate("0002_referrals.sql");
+  }
+  if (db.prepare("SELECT value FROM booking_settings WHERE key='referral_code_format'").get()?.value !== "MHI04") {
+    migrate("0003_referral_code_format.sql");
   }
   db.exec("CREATE INDEX IF NOT EXISTS attempts_by_session ON attempts(session, updatedAt DESC)");
   db.exec("CREATE INDEX IF NOT EXISTS attempts_by_check ON attempts(nextCheck)");

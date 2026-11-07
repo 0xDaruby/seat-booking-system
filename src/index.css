@@ -107,13 +107,11 @@ button:disabled { cursor: not-allowed; opacity: .62; }
 .state-card h1, .centered h1 { font-size: clamp(2.5rem, 6.25vw, 4.75rem); }
 .state-card > p + p { margin-top: 12px; }
 .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-block: 20px; }
-.ticket { margin-top: 20px; background: var(--paper); color: var(--ink); border-top: 8px solid var(--lime); padding: clamp(18px, 4vw, 36px); overflow-wrap: anywhere; }
-.ticket .eyebrow { color: var(--green); }
-.ticket h2 { margin-block: 10px; }
-.ticket dl { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; padding-block: 15px; margin-top: 16px; border-block: 1px dashed #777b6b; }
-.ticket dd { font-weight: 700; font-size: 1.15rem; }
-.ticket-id { margin-top: 12px; }
-.ticket-id span { margin-right: 8px; font-size: .75rem; font-weight: 700; text-transform: uppercase; }
+.ticket-page h1 { font-size: clamp(2.5rem, 6.25vw, 4.75rem); }
+.ticket { position: relative; width: 100%; aspect-ratio: 9 / 4; margin-top: 24px; background: var(--paper); color: var(--ink); }
+.ticket-background { display: block; width: 100%; height: 100%; }
+.ticket-lettering { position: absolute; inset: 0; width: 100%; height: 100%; }
+.ticket-summary { margin-top: 16px; overflow-wrap: anywhere; }
 .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 130px), 1fr)); gap: 12px; margin-top: 20px; }
 .metrics div { padding: 14px; border: 1px solid var(--divider); }
 .metrics dd { font: bold 2rem var(--serif); }

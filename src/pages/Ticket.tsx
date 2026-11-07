@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import EventShell from "../components/EventShell";
-import { api, event } from "../booking";
+import TicketArtwork from "../components/TicketArtwork";
+import { api } from "../booking";
 import type { Booking } from "../booking";
 
 export default function Ticket() {
@@ -31,7 +32,26 @@ export default function Ticket() {
     setError("");
     try {
       const { default: html2canvas } = await import("html2canvas");
-      const canvas = await html2canvas(artwork.current, { scale: 2, backgroundColor: "#eeece2" });
+      await document.fonts.ready;
+      await Promise.all([...artwork.current.querySelectorAll("img")].map((image) => image.decode()));
+      const canvas = await html2canvas(artwork.current, {
+        scale: 2, width: 1440, height: 640, backgroundColor: "#eeece2", logging: false,
+        onclone: (document) => {
+          const ticket = document.querySelector<HTMLElement>("[data-ticket-artwork]");
+          if (ticket) {
+            ticket.style.width = "1440px";
+            ticket.style.maxWidth = "none";
+            ticket.style.height = "640px";
+            const lettering = ticket.querySelector<SVGSVGElement>("svg");
+            if (lettering) {
+              lettering.setAttribute("width", "1440");
+              lettering.setAttribute("height", "640");
+              lettering.style.width = "1440px";
+              lettering.style.height = "640px";
+            }
+          }
+        },
+      });
       const filename = "My-Highs-and-I-Series-004-" + ticket.seat;
       if (format === "PDF") {
         const { jsPDF } = await import("jspdf");
@@ -61,22 +81,14 @@ export default function Ticket() {
   }
 
   return <EventShell>
-    <section className="wrap centered">
+    <section className="wrap ticket-page">
       <p className="eyebrow">Series 004 / Admission</p>
       <h1 ref={heading} tabIndex={-1}>{ticket ? "Your ticket." : "Ticket confirmation."}</h1>
       {loading && <p role="status">Loading your ticket…</p>}
       {error && <p className="error" role="alert">{error}</p>}
       {ticket ? <>
-        <article className="ticket" ref={artwork}>
-          <p className="eyebrow">{event.name} · {event.edition}</p>
-          <h2>{event.theme}</h2>
-          <p>{event.date} · {event.time}<br />{event.venue}</p>
-          <dl>
-            <div><dt>Attendee</dt><dd>{ticket.name}</dd></div>
-            <div><dt>Seat</dt><dd>{ticket.seat}</dd></div>
-          </dl>
-          <p className="ticket-id"><span>Ticket ID</span> {ticket.id}</p>
-        </article>
+        <TicketArtwork ticket={ticket} ref={artwork} />
+        <p className="ticket-summary">{ticket.name} · Seat {ticket.seat}</p>
         <div className="actions">
           <button className="button" disabled={exporting} onClick={() => download("PNG")}>Download PNG</button>
           <button className="outline" disabled={exporting} onClick={() => download("PDF")}>Download PDF</button>

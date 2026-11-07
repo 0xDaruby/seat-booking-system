@@ -176,10 +176,10 @@ export default function SeatBooking() {
             onChange={(e) => draft.update({ email: e.target.value })} /></label>
           <label className="referral-field">Referral code <span className="muted">Optional</span>
             <input ref={referralInput} name="referralCode" autoComplete="off" autoCapitalize="characters" spellCheck={false}
-              maxLength={32} placeholder="Code from your ambassador" value={draft.referralCode} readOnly={validating}
+              maxLength={32} placeholder="e.g. MHI04 001" value={draft.referralCode} readOnly={validating}
               aria-invalid={Boolean(referralError)} aria-describedby={referralError ? "referral-help referral-error" : "referral-help"}
               onChange={(e) => { draft.update({ referralCode: e.target.value.toUpperCase() }); setReferralError(""); }} />
-            <span id="referral-help" className="muted referral-help">An ambassador invited you? Enter their code here. You can also book without a code.</span>
+            <span id="referral-help" className="muted referral-help">An ambassador invited you? Enter their code here.</span>
           </label>
           {referralError && <p id="referral-error" className="error" role="alert">{referralError}</p>}
           <div className="order" aria-live="polite">

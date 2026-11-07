@@ -112,7 +112,7 @@
         "BOOKING_ADMIN_ORIGIN": "https://admin.myhighsandi.me",
         "BOOKING_WWW_ORIGIN": "https://www.myhighsandi.me",
         "BOOKING_LEGACY_ORIGIN": "https://series-004.edaraiquaibom16.workers.dev",
-        "BOOKING_PAYSTACK_CHANNELS": "card,bank_transfer",
+        "BOOKING_PAYSTACK_CHANNELS": "card,bank_transfer,bank",
         "BOOKING_ENABLE_LIVE_MODE": "1",
         "BOOKING_CHECKOUT_PAUSED": "0"
       },

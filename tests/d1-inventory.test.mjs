@@ -15,7 +15,7 @@ test("mode binds once, refuses foreign attempts and starts fresh live checkout p
   await claim(inventory, "session", "A1");
   sqlite.exec("DELETE FROM booking_settings WHERE key='mode'");
   await assert.rejects(inventory.bindMode("test"), /belongs to another mode/);
-  assert.equal(sqlite.prepare("SELECT count(*) AS total FROM booking_settings").get().total, 0);
+  assert.equal(sqlite.prepare("SELECT count(*) AS total FROM booking_settings WHERE key IN ('mode','checkout_paused')").get().total, 0);
   await inventory.bindMode("preview");
   await assert.rejects(inventory.bindMode("live"), /belongs to another mode/);
 

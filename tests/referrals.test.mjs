@@ -18,10 +18,10 @@ test("the referral allowlist has exactly 55 unique codes and normalizes only app
   const roster = readFileSync(new URL("../referral-codes.csv", import.meta.url), "utf8").trim().split(/\r?\n/).slice(1)
     .map(row => row.split(",")[1]);
   assert.deepEqual(roster, codes);
-  for (const code of codes) assert.match(code, /^S004-[A-HJ-KM-NP-Z2-9]{6}$/);
+  assert.deepEqual(codes, Array.from({ length: 55 }, (_, index) => 'MHI04 ' + String(index + 1).padStart(3, '0')));
   assert.equal(normalizeReferralCode("  " + codes[0].toLowerCase() + "  "), codes[0]);
   for (const value of [undefined, null, "", "   "]) assert.equal(normalizeReferralCode(value), null);
-  for (const value of ["RANDOM", "S004-AAAAAA", [], {}, 12, true, "x".repeat(10000)]) {
+  for (const value of ["RANDOM", "MHI04 000", "MHI04 056", "MHI04001", "S004-3MZ42P", [], {}, 12, true, "x".repeat(10000)]) {
     assert.throws(() => normalizeReferralCode(value), /referral code/i);
   }
 });
@@ -32,13 +32,18 @@ test("the additive referral migration preserves old paid bookings and enforces t
   try {
     const old = new DatabaseSync(path);
     old.exec(readFileSync(new URL("../migrations/0001_inventory.sql", import.meta.url), "utf8"));
+    old.exec(readFileSync(new URL("../migrations/0002_referrals.sql", import.meta.url), "utf8"));
     old.prepare(`INSERT INTO attempts(ref,session,seat,name,email,amount,currency,mode,status,ticketId,expiresAt,nextCheck,updatedAt)
       VALUES('legacy','legacy-session','J10','Earlier Guest','old@example.test',200000,'NGN','preview','paid','OLD-TICKET',1,1,1)`).run();
+    old.prepare(`INSERT INTO attempts(ref,session,seat,name,email,amount,currency,mode,status,ticketId,expiresAt,nextCheck,updatedAt,referralCode)
+      VALUES('referred-legacy','referred-session','J9','Earlier Referred Guest','referred@example.test',200000,'NGN','preview','paid','REFERRED-TICKET',1,1,1,'S004-3MZ42P')`).run();
     old.close();
     const inventory = openInventory(path);
     assert.equal(inventory.get("legacy").ticketId, "OLD-TICKET");
     assert.equal(inventory.get("legacy").referralCode, null);
-    assert.deepEqual({ ...inventory.paidTotals() }, { confirmed: 1, referred: 0, withoutReferral: 1 });
+    assert.equal(inventory.get("referred-legacy").referralCode, "MHI04 001");
+    assert.equal(inventory.get("referred-legacy").ticketId, "REFERRED-TICKET");
+    assert.deepEqual({ ...inventory.paidTotals() }, { confirmed: 2, referred: 1, withoutReferral: 1 });
     inventory.close();
     const migrated = new DatabaseSync(path);
     migrated.exec("PRAGMA foreign_keys=ON");
