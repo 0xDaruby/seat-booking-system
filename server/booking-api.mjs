@@ -1,6 +1,7 @@
 import { latePaymentReviewMs, seats } from "./event.mjs";
 import { settleVerifiedAsync } from "./paystack.mjs";
 import { organizerApi } from "./admin.mjs";
+import { normalizeReferralCode, referralError } from "./referrals.mjs";
 import { apiHeaders, deny, digest, json, readCookie, setCookie, token } from "./http.mjs";
 
 const cookieMaxAge = 30 * 24 * 3600;
@@ -34,7 +35,7 @@ function publicBooking(attempt) {
   if (!attempt) return null;
   const status = attempt.resolved ? "resolved" : attempt.status === "initializing" ? "pending" : attempt.status;
   return {
-    status, expiresAt: attempt.expiresAt,
+    status, expiresAt: attempt.expiresAt, referralCode: attempt.referralCode ?? null,
     ...(status === "pending" && Date.now() < attempt.expiresAt && attempt.checkoutUrl && { checkoutUrl: attempt.checkoutUrl }),
     ...(status === "paid" && { ticket: { id: attempt.ticketId, name: attempt.name, seat: attempt.seat } }),
   };
@@ -145,22 +146,29 @@ export function createBookingApi({ origin, mode, gateway, inventory, accounts = 
           recovery: Boolean(attempt && (payable.includes(attempt.status) || terminal.includes(attempt.status))),
         });
       }
+      if (route === "/api/referral/validate" && post) {
+        try { return json(headers, 200, { referralCode: normalizeReferralCode(data.referralCode) }); }
+        catch { return deny(headers, 400, referralError); }
+      }
       if (route === "/api/checkout" && post) {
         if (!session) return deny(headers, 409, "Reload seat availability and try again.");
         const { seat, requestId } = data;
         const name = typeof data.name === "string" ? data.name.trim() : "";
         const email = typeof data.email === "string" ? data.email.trim() : "";
+        let referralCode;
+        try { referralCode = normalizeReferralCode(data.referralCode); }
+        catch { return deny(headers, 400, referralError); }
         if (!seats.has(seat) || typeof requestId !== "string" || !/^[a-f0-9-]{36}$/.test(requestId) ||
           !name || name.length > 120 || /[\x00-\x1f\x7f]/.test(name) ||
           email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
           return deny(headers, 400, "Enter a valid name and email address and choose a seat.");
         }
         if (!await allowCheckout(Date.now())) return deny(headers, 429, "Too many attempts. Please try again shortly.");
-        const { created, existing, paused } = await inventory.claim({ session, seat, name, email, mode, requestId, forcePause });
+        const { created, existing, paused } = await inventory.claim({ session, seat, name, email, mode, requestId, forcePause, referralCode });
         if (paused) return deny(headers, 423, "New reservations are paused. Please check back later.");
         if (existing) {
           const result = publicBooking(existing);
-          if (existing.seat !== seat || existing.name !== name || existing.email !== email) delete result.checkoutUrl;
+          if (existing.seat !== seat || existing.name !== name || existing.email !== email || (existing.referralCode ?? null) !== referralCode) delete result.checkoutUrl;
           return json(headers, 200, result);
         }
         if (!created) return deny(headers, 409, "Someone else reserved that seat. Please choose another.");

@@ -1,4 +1,5 @@
 import { event, holdMs, latePaymentReviewMs } from "./event.mjs";
+import { normalizeReferralCode } from "./referrals.mjs";
 
 const active = "('initializing','pending','paid')";
 const holds = "('initializing','pending')";
@@ -60,17 +61,18 @@ export function openD1Inventory(db) {
     },
     latest: (session) => bySession(session).first(),
     get,
-    async claim({ session, seat, name, email, mode, requestId, forcePause = false }, now = Date.now()) {
+    async claim({ session, seat, name, email, mode, requestId, forcePause = false, referralCode }, now = Date.now()) {
+      referralCode = normalizeReferralCode(referralCode);
       const ref = "s004-" + (await hash(session + ":" + requestId)).slice(0, 32);
       const [inserted, latest, replay, pause] = await db.batch([
-        query(`INSERT INTO attempts(ref,session,seat,name,email,amount,currency,mode,status,expiresAt,nextCheck,updatedAt)
-          SELECT ?,?,?,?,?,?,?,?,'initializing',?,?,?
+        query(`INSERT INTO attempts(ref,session,seat,name,email,amount,currency,mode,status,expiresAt,nextCheck,updatedAt,referralCode)
+          SELECT ?,?,?,?,?,?,?,?,'initializing',?,?,?,?
           WHERE ?=0 AND ${pauseCheck}='0'
           AND EXISTS (SELECT 1 FROM booking_settings WHERE key='mode' AND value=?)
           AND NOT EXISTS (SELECT 1 FROM attempts WHERE session=? AND status IN ${recoverable})
           ON CONFLICT DO NOTHING`,
         ref, session, seat, name, email, event.priceKobo, event.currency, mode,
-        now + holdMs, now + 30_000, now, Number(forcePause), mode, session),
+        now + holdMs, now + 30_000, now, referralCode, Number(forcePause), mode, session),
         bySession(session),
         byRef(ref),
         pauseValue(),
@@ -122,28 +124,42 @@ export function openD1Inventory(db) {
       if (!row) throw new Error("Seat availability snapshot is missing.");
       return JSON.parse(row.seats);
     },
-    async records() {
+    async records(view = "confirmed") {
       const { results } = await query(`
-        SELECT a.ref, a.seat, a.status, a.updatedAt, r.outcome AS resolution
-        FROM attempts a LEFT JOIN payment_resolutions r ON r.ref=a.ref ORDER BY a.rowid DESC
+        SELECT a.ref, a.seat, a.status, a.updatedAt, a.name, a.email, a.ticketId, a.referralCode, r.outcome AS resolution
+        FROM attempts a LEFT JOIN payment_resolutions r ON r.ref=a.ref
+        WHERE ${view === "attempts" ? "NOT (a.status='paid' AND a.ticketId IS NOT NULL)" : "a.status='paid' AND a.ticketId IS NOT NULL"}
+        ORDER BY a.rowid DESC
       `).all();
       return results;
     },
     async detail(ref) {
       const [booking, resolution, auditTrail] = await db.batch([
-        query("SELECT ref,seat,status,name,email,ticketId,expiresAt,updatedAt FROM attempts WHERE ref=?", ref),
+        query("SELECT ref,seat,status,name,email,ticketId,expiresAt,updatedAt,referralCode FROM attempts WHERE ref=?", ref),
         query("SELECT outcome,note,actor,at FROM payment_resolutions WHERE ref=?", ref),
         query("SELECT action,actor,at FROM organizer_audit WHERE ref=? ORDER BY id DESC LIMIT 15", ref),
       ]);
       if (!firstRow(booking)) return null;
       return { ...firstRow(booking), resolution: firstRow(resolution) ?? null, auditTrail: auditTrail.results };
     },
-    async exportRows() {
+    async exportRows(view = "confirmed") {
       const { results } = await query(`
-        SELECT a.ref, a.seat, a.status, a.updatedAt, a.ticketId,
+        SELECT a.ref, a.seat, a.status, a.updatedAt, a.ticketId, a.referralCode,
         CASE WHEN a.status='paid' THEN a.name END AS attendee, r.outcome AS resolution
-        FROM attempts a LEFT JOIN payment_resolutions r ON r.ref=a.ref ORDER BY a.rowid DESC
+        FROM attempts a LEFT JOIN payment_resolutions r ON r.ref=a.ref
+        WHERE ${view === "attempts" ? "NOT (a.status='paid' AND a.ticketId IS NOT NULL)" : "a.status='paid' AND a.ticketId IS NOT NULL"}
+        ORDER BY a.rowid DESC
       `).all();
+      return results;
+    },
+    async paidTotals() {
+      return query(`SELECT COUNT(*) AS confirmed, COUNT(referralCode) AS referred,
+        COUNT(*) - COUNT(referralCode) AS withoutReferral FROM attempts WHERE status='paid' AND ticketId IS NOT NULL`).first();
+    },
+    async referrals() {
+      const { results } = await query(`SELECT c.code, COUNT(a.ref) AS paidBookings FROM referral_codes c
+        LEFT JOIN attempts a ON a.referralCode=c.code AND a.status='paid' AND a.ticketId IS NOT NULL
+        GROUP BY c.code ORDER BY c.code`).all();
       return results;
     },
     async isPaused() {

@@ -130,6 +130,13 @@ th, td { padding: .6rem; border-bottom: 1px solid var(--divider); }
 .admin-filters label, .admin-resolution label { display: grid; gap: 5px; font-size: .875rem; font-weight: 650; }
 .admin input, .admin select { min-width: 0; width: 100%; min-height: 44px; padding: .55rem .65rem; border: 1px solid #85877a; border-radius: 0; background: var(--ink); color: var(--paper); font: 400 1rem var(--sans); }
 .admin-table { min-width: 440px; }
+.admin-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-block: 20px; }
+.admin-tabs button { min-height: 44px; }
+.report-heading { font-size: clamp(1.6rem, 4vw, 2.5rem); margin-top: 26px; }
+.referral-help { font-size: .82rem; font-weight: 400; }
+.referral-field { padding: 14px; border: 1px solid var(--divider); background: var(--panel); }
+.referral-field input[aria-invalid="true"] { border-color: var(--error); }
+.admin-table code, .referral-table code { white-space: nowrap; }
 .admin-state { display: inline-block; padding: 2px 7px; border: 1px solid #85877a; font-size: .8rem; white-space: nowrap; }
 .admin-state.state-paid { border-color: var(--lime); color: var(--lime); }
 .admin-state.state-exception { border-color: var(--error); color: var(--error); }
@@ -144,8 +151,7 @@ th, td { padding: .6rem; border-bottom: 1px solid var(--divider); }
 .admin-audit ul { margin: 0; padding-left: 1.25rem; }
 @media (max-width: 480px) {
   .admin-filters { grid-template-columns: minmax(0, 1fr); }
-  .admin-table { min-width: 0; }
-  .admin-table :is(th, td):nth-child(3) { display: none; }
+  .admin-table { min-width: 620px; }
 }
 @media (max-width: 850px) { :root { --gutter: 18px; } }
 @media (max-width: 680px) {

@@ -93,7 +93,9 @@ test("organizer permissions, audited simulated release, booking ownership and sp
   assert.equal((await checkout(second, "B1")).status, 201);
   const { records } = await (await req("admin/records", { cookie: admin })).json();
   const sold = records.find((row) => row.seat === "A1");
-  const held = records.find((row) => row.seat === "B1");
+  assert.ok(records.every(row => row.status === "paid"));
+  const { records: paymentAttempts } = await (await req("admin/records?view=attempts", { cookie: admin })).json();
+  const held = paymentAttempts.find((row) => row.seat === "B1");
   assert.equal((await req("admin/release", { cookie: admin, data: { ref: sold.ref } })).status, 409);
   assert.equal((await req("admin/release", { cookie: admin, data: { ref: held.ref }, headers: { Origin: "https://wrong.example.test" } })).status, 403);
   assert.equal((await req("admin/release", { cookie: admin, data: { ref: held.ref } })).status, 200);

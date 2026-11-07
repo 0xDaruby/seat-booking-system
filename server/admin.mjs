@@ -91,6 +91,10 @@ export function organizerApi({ inventory, accounts, secure, mode, forcePause, ve
     const account = session && accounts.get(session.actor);
     if (!account || digest(account) !== session.credential) return deny(res, 401, "Sign in to continue.");
     const { actor } = session;
+    const view = query.get("view") ?? "confirmed";
+    if (["/api/admin/records", "/api/admin/export"].includes(route) && !["confirmed", "attempts", "referrals"].includes(view)) {
+      return deny(res, 400, "Choose a valid dashboard section.");
+    }
 
     if (route === "/api/admin/logout" && post) {
       await inventory.endAdminSession(id);
@@ -99,7 +103,10 @@ export function organizerApi({ inventory, accounts, secure, mode, forcePause, ve
     }
     if (route === "/api/admin/records" && !post) {
       return json(res, 200, {
-        records: await inventory.records(), actor, mode, checkoutPaused: forcePause || await inventory.isPaused(),
+        records: view === "referrals" ? [] : await inventory.records(view), view,
+        paidTotals: await inventory.paidTotals(),
+        ...(view === "referrals" && { referrals: await inventory.referrals() }),
+        actor, mode, checkoutPaused: forcePause || await inventory.isPaused(),
         forcePause, checkoutChange: await inventory.checkoutHistory(),
       });
     }
@@ -139,13 +146,16 @@ export function organizerApi({ inventory, accounts, secure, mode, forcePause, ve
       return json(res, 200, { recorded: true });
     }
     if (route === "/api/admin/export" && !post) {
-      const rows = (await inventory.exportRows()).map(({ seat, status, ref, updatedAt, ticketId, attendee, resolution }) =>
-        [seat, status, ref, new Date(updatedAt).toISOString(), attendee, ticketId, resolution].map(csvCell).join(",")
-      );
-      await inventory.auditAction("records exported", actor);
+      const rows = view === "referrals" ? (await inventory.referrals()).map(({ code, paidBookings }) =>
+        [code, paidBookings].map(csvCell).join(",")) :
+        (await inventory.exportRows(view)).map(({ seat, status, ref, updatedAt, ticketId, attendee, resolution, referralCode }) =>
+          [seat, status, ref, new Date(updatedAt).toISOString(), attendee, ticketId, resolution, referralCode].map(csvCell).join(",")
+        );
+      await inventory.auditAction(view === "confirmed" ? "records exported" : view + " exported", actor);
       res.set("Content-Type", "text/csv; charset=utf-8");
-      res.set("Content-Disposition", 'attachment; filename="series-004-bookings.csv"');
-      return new Response(["seat,status,reference,updated_at,attendee,ticket_id,resolution", ...rows].join("\r\n"), { headers: res });
+      res.set("Content-Disposition", `attachment; filename="series-004-${view}.csv"`);
+      const heading = view === "referrals" ? "referral_code,successful_paid_bookings" : "seat,status,reference,updated_at,attendee,ticket_id,resolution,referral_code";
+      return new Response([heading, ...rows].join("\r\n"), { headers: res });
     }
     return deny(res, 404, "Route unavailable.");
   };

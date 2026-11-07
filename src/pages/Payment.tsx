@@ -29,7 +29,7 @@ export default function Payment() {
 }
 
 function PaymentReview() {
-  const { name, email, seat, getRequestId } = useStore();
+  const { name, email, seat, referralCode, getRequestId } = useStore();
   const navigate = useNavigate();
   const heading = useRef<HTMLHeadingElement>(null);
   const submitting = useRef(false);
@@ -65,7 +65,7 @@ function PaymentReview() {
       if (availability.checkoutPaused) throw new Error("New reservations are paused. Please check back later.");
       if (availability.seats[seat]) throw new ApiError("That seat is unavailable. Choose another seat to continue.", 409);
       checkoutRequested = true;
-      const result = await api<Booking>("checkout", { name, email, seat, requestId: getRequestId() }, AbortSignal.timeout(verifyTimeout));
+      const result = await api<Booking>("checkout", { name, email, seat, referralCode, requestId: getRequestId() }, AbortSignal.timeout(verifyTimeout));
       if (!mounted.current) return;
       if (result.checkoutUrl) openCheckout(result.checkoutUrl);
       else navigate("/payment?recover=1", { replace: true });
@@ -98,6 +98,7 @@ function PaymentReview() {
             <div><dt>Full name</dt><dd>{name}</dd></div>
             <div><dt>Email address</dt><dd>{email}</dd></div>
             <div><dt>Selected seat</dt><dd>{seat}</dd></div>
+            <div><dt>Referral code</dt><dd>{referralCode.trim() || "Not used"}</dd></div>
           </dl>
           <a className="outline" href="/#booking">Edit booking</a>
         </section>

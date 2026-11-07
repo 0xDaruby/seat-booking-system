@@ -1,6 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
+import { readFileSync } from "node:fs";
 import { event, holdMs } from "./event.mjs";
+import { normalizeReferralCode } from "./referrals.mjs";
 
 export { seats, holdMs, graceMs } from "./event.mjs";
 const active = "('initializing','pending','paid')";
@@ -34,6 +36,17 @@ export function openInventory(path) {
       note TEXT NOT NULL, actor TEXT NOT NULL, at INTEGER NOT NULL
     );
   `);
+  if (!db.prepare("PRAGMA table_info(attempts)").all().some(column => column.name === "referralCode")) {
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      db.exec(readFileSync(new URL("../migrations/0002_referrals.sql", import.meta.url), "utf8"));
+      db.exec("COMMIT");
+    } catch (error) {
+      db.exec("ROLLBACK");
+      db.close();
+      throw error;
+    }
+  }
   db.exec("CREATE INDEX IF NOT EXISTS attempts_by_session ON attempts(session, updatedAt DESC)");
   db.exec("CREATE INDEX IF NOT EXISTS attempts_by_check ON attempts(nextCheck)");
 
@@ -44,8 +57,8 @@ export function openInventory(path) {
   `);
   const get = db.prepare("SELECT * FROM attempts WHERE ref = ?");
   const insert = db.prepare(`
-    INSERT INTO attempts(ref,session,seat,name,email,amount,currency,mode,status,expiresAt,nextCheck,updatedAt)
-    VALUES(?,?,?,?,?,?,?,?,'initializing',?,?,?)
+    INSERT INTO attempts(ref,session,seat,name,email,amount,currency,mode,status,expiresAt,nextCheck,updatedAt,referralCode)
+    VALUES(?,?,?,?,?,?,?,?,'initializing',?,?,?,?)
     ON CONFLICT DO NOTHING
   `);
   const change = db.prepare(`
@@ -89,7 +102,8 @@ export function openInventory(path) {
     },
     latest: (session) => latest.get(session),
     get: (ref) => get.get(ref),
-    claim({ session, seat, name, email, mode, requestId, forcePause = false }, now = Date.now()) {
+    claim({ session, seat, name, email, mode, requestId, forcePause = false, referralCode }, now = Date.now()) {
+      referralCode = normalizeReferralCode(referralCode);
       const ref = "s004-" + createHash("sha256").update(session + ":" + requestId).digest("hex").slice(0, 32);
       return transaction(() => {
         const existing = latest.get(session);
@@ -99,7 +113,7 @@ export function openInventory(path) {
         const replay = get.get(ref);
         if (replay) return { existing: replay };
         if (forcePause || isPaused()) return { paused: true };
-        const { changes } = insert.run(ref, session, seat, name, email, event.priceKobo, event.currency, mode, now + holdMs, now + 30_000, now);
+        const { changes } = insert.run(ref, session, seat, name, email, event.priceKobo, event.currency, mode, now + holdMs, now + 30_000, now, referralCode);
         return changes ? { created: get.get(ref) } : {};
       });
     },
@@ -127,25 +141,38 @@ export function openInventory(path) {
       const allocated = db.prepare(`SELECT seat, status FROM attempts WHERE status IN ${active}`).all();
       return Object.fromEntries(allocated.map(({ seat, status }) => [seat, status === "paid" ? "sold" : "held"]));
     },
-    records() {
+    records(view = "confirmed") {
       return db.prepare(`
-        SELECT a.ref, a.seat, a.status, a.updatedAt, r.outcome AS resolution
-        FROM attempts a LEFT JOIN payment_resolutions r ON r.ref=a.ref ORDER BY a.rowid DESC
+        SELECT a.ref, a.seat, a.status, a.updatedAt, a.name, a.email, a.ticketId, a.referralCode, r.outcome AS resolution
+        FROM attempts a LEFT JOIN payment_resolutions r ON r.ref=a.ref
+        WHERE ${view === "attempts" ? "NOT (a.status='paid' AND a.ticketId IS NOT NULL)" : "a.status='paid' AND a.ticketId IS NOT NULL"}
+        ORDER BY a.rowid DESC
       `).all();
     },
     detail(ref) {
-      const booking = db.prepare("SELECT ref,seat,status,name,email,ticketId,expiresAt,updatedAt FROM attempts WHERE ref=?").get(ref);
+      const booking = db.prepare("SELECT ref,seat,status,name,email,ticketId,expiresAt,updatedAt,referralCode FROM attempts WHERE ref=?").get(ref);
       if (!booking) return null;
       const resolution = db.prepare("SELECT outcome,note,actor,at FROM payment_resolutions WHERE ref=?").get(ref) ?? null;
       const auditTrail = db.prepare("SELECT action,actor,at FROM organizer_audit WHERE ref=? ORDER BY id DESC LIMIT 15").all(ref);
       return { ...booking, resolution, auditTrail };
     },
-    exportRows() {
+    exportRows(view = "confirmed") {
       return db.prepare(`
-        SELECT a.ref, a.seat, a.status, a.updatedAt, a.ticketId,
+        SELECT a.ref, a.seat, a.status, a.updatedAt, a.ticketId, a.referralCode,
         CASE WHEN a.status='paid' THEN a.name END AS attendee, r.outcome AS resolution
-        FROM attempts a LEFT JOIN payment_resolutions r ON r.ref=a.ref ORDER BY a.rowid DESC
+        FROM attempts a LEFT JOIN payment_resolutions r ON r.ref=a.ref
+        WHERE ${view === "attempts" ? "NOT (a.status='paid' AND a.ticketId IS NOT NULL)" : "a.status='paid' AND a.ticketId IS NOT NULL"}
+        ORDER BY a.rowid DESC
       `).all();
+    },
+    paidTotals() {
+      return db.prepare(`SELECT COUNT(*) AS confirmed, COUNT(referralCode) AS referred,
+        COUNT(*) - COUNT(referralCode) AS withoutReferral FROM attempts WHERE status='paid' AND ticketId IS NOT NULL`).get();
+    },
+    referrals() {
+      return db.prepare(`SELECT c.code, COUNT(a.ref) AS paidBookings FROM referral_codes c
+        LEFT JOIN attempts a ON a.referralCode=c.code AND a.status='paid' AND a.ticketId IS NOT NULL
+        GROUP BY c.code ORDER BY c.code`).all();
     },
     isPaused,
     setPaused(paused, actor, now = Date.now()) {

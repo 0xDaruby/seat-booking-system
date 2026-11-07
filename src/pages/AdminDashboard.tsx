@@ -2,14 +2,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import EventShell from "../components/EventShell";
-import { api, ApiError, event } from "../booking";
+import { api, ApiError } from "../booking";
 
 type Status = "initializing" | "pending" | "paid" | "failed" | "canceled" | "expired" | "exception";
 type Resolution = "refund-confirmed" | "no-charge-confirmed" | "handled-externally";
-type Attempt = { seat: string; status: Status; updatedAt: number; ref: string; resolution: Resolution | null };
+type View = "confirmed" | "referrals" | "attempts";
+type Attempt = { seat: string; status: Status; updatedAt: number; ref: string; name: string; email: string;
+  ticketId: string | null; referralCode: string | null; resolution: Resolution | null };
 type Audit = { action: string; actor: string; at: number };
 type Snapshot = {
-  records: Attempt[]; actor: string; mode: "preview" | "test" | "live";
+  records: Attempt[]; view: View; paidTotals: { confirmed: number; referred: number; withoutReferral: number };
+  referrals?: { code: string; paidBookings: number }[]; actor: string; mode: "preview" | "test" | "live";
   checkoutPaused: boolean; forcePause: boolean; checkoutChange: Audit | null;
 };
 type Detail = Omit<Attempt, "resolution"> & {
@@ -31,7 +34,9 @@ const held = (status: Status) => status === "initializing" || status === "pendin
 const localTime = (ms: number) => new Date(ms).toLocaleString("en-NG", { timeZone: "Africa/Lagos" });
 
 export default function AdminDashboard() {
-  const [snapshot, setSnapshot] = useState<Snapshot>();
+  const [view, setView] = useState<View>("confirmed");
+  const [data, setSnapshot] = useState<Snapshot>();
+  const snapshot = data?.view === view ? data : undefined;
   const [detail, setDetail] = useState<Detail>();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
@@ -51,13 +56,13 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     let active = true;
-    api<Snapshot>("admin/records").then((data) => {
+    api<Snapshot>("admin/records?view=" + view).then((data) => {
       if (active) setSnapshot(data);
     }).catch((err: unknown) => {
       if (active) reportError(err);
     });
     return () => { active = false; };
-  }, [reportError]);
+  }, [reportError, view]);
 
   async function run(action: () => Promise<void>) {
     setBusy(true);
@@ -74,38 +79,47 @@ export default function AdminDashboard() {
   }
 
   async function refresh(ref?: string) {
-    const records = api<Snapshot>("admin/records").then(setSnapshot);
+    const records = api<Snapshot>("admin/records?view=" + view).then(setSnapshot);
     await Promise.all([records, ref && loadDetail(ref)]);
   }
 
-  const counts = { held: 0, sold: 0, exceptions: 0 };
-  for (const row of snapshot?.records ?? []) {
-    if (held(row.status)) counts.held += 1;
-    if (row.status === "paid") counts.sold += 1;
-    if (row.status === "exception" && !row.resolution) counts.exceptions += 1;
-  }
   const shown = snapshot?.records.filter((row) => {
     const term = query.trim().toLowerCase();
-    if (term && !row.seat.toLowerCase().includes(term) && !row.ref.includes(term)) return false;
+    if (term && ![row.seat, row.ref, row.name, row.email, row.referralCode ?? ""].some(value => value.toLowerCase().includes(term))) return false;
+    if (view !== "attempts") return true;
     if (filter === "held") return held(row.status);
     if (filter === "review") return row.status === "exception" && !row.resolution;
     if (filter === "resolved") return Boolean(row.resolution);
     return filter === "all" || row.status === filter;
   });
+  const referrals = snapshot?.referrals?.filter(row => row.code.toLowerCase().includes(query.trim().toLowerCase()));
+
+  function changeView(next: View) {
+    setDetail(undefined);
+    setError("");
+    setNotice("");
+    setQuery("");
+    setFilter("all");
+    setView(next);
+  }
 
   return <EventShell><section className="wrap booking admin">
     <p className="eyebrow">Series 004 / Organizer</p>
-    <h1>Seat management.</h1>
-    <p className="muted">Review allocations, confirmed tickets, and payment exceptions.</p>
+    <h1>Event dashboard.</h1>
+    <p className="muted">Confirmed attendees and referral counts include successful paid bookings only.</p>
+    <nav className="admin-tabs" aria-label="Dashboard sections">
+      {([["confirmed", "Confirmed bookings"], ["referrals", "Referrals"], ["attempts", "Payment Attempts"]] as const).map(([key, label]) =>
+        <button key={key} type="button" aria-pressed={view === key} className={view === key ? "button" : "outline"}
+          disabled={busy} onClick={() => changeView(key)}>{label}</button>)}
+    </nav>
     {error && <div role="alert" className="admin-message error">{error} <button className="text-button" disabled={busy} onClick={() => run(() => refresh(detail?.ref))}>Refresh records</button></div>}
     {notice && <p className="admin-message" role="status">{notice}</p>}
     {!snapshot && !error && <p role="status">Loading records…</p>}
     {snapshot && <>
       <dl className="metrics">
-        <div><dt>Available</dt><dd>{event.rows.length * event.seatsPerRow - counts.held - counts.sold}</dd></div>
-        <div><dt>Held</dt><dd>{counts.held}</dd></div>
-        <div><dt>Sold</dt><dd>{counts.sold}</dd></div>
-        <div><dt>Needs review</dt><dd>{counts.exceptions}</dd></div>
+        <div><dt>Confirmed attendees</dt><dd>{snapshot.paidTotals.confirmed}</dd></div>
+        <div><dt>With referral codes</dt><dd>{snapshot.paidTotals.referred}</dd></div>
+        <div><dt>Without referral codes</dt><dd>{snapshot.paidTotals.withoutReferral}</dd></div>
       </dl>
       <div className="admin-control">
         <div>
@@ -122,11 +136,12 @@ export default function AdminDashboard() {
             setNotice(paused ? "New reservations paused." : "New reservations reopened.");
             await refresh(detail?.ref);
           })}>{snapshot.checkoutPaused ? "Reopen checkout" : "Pause checkout"}</button>
-          <a href="/api/admin/export" className="button">Export CSV</a>
+          <a href={"/api/admin/export?view=" + view} className="button">{view === "referrals" ? "Export referral counts" : view === "attempts" ? "Export payment attempts" : "Export confirmed bookings"} CSV</a>
         </div>
       </div>
       <div className="admin-toolbar">
         <p className="muted">Signed in as {snapshot.actor}</p>
+        <button className="text-button" disabled={busy} onClick={() => run(() => refresh(detail?.ref))}>Refresh records</button>
         <button className="text-button" disabled={busy} onClick={() => run(async () => {
           await api("admin/logout", {});
           navigate("/admin-login", { replace: true });
@@ -146,23 +161,35 @@ export default function AdminDashboard() {
           setNotice("Resolution recorded.");
           await refresh(detail.ref);
         })} />}
+      <h2 className="report-heading">{view === "confirmed" ? "Confirmed bookings" : view === "referrals" ? "Referral summary" : "Payment Attempts"}</h2>
+      <p className="muted">{view === "referrals" ? "All 55 codes are listed, including codes with zero paid bookings. Use these counts to calculate commissions." :
+        view === "attempts" ? "Pending, unsuccessful, abandoned, and review-needed payments. These never increase confirmed-attendee or referral totals." :
+        "Successfully paid attendees, with or without a referral code."}</p>
       <div className="admin-filters">
-        <label>Search by seat or reference<input type="search" value={query} onChange={(e) => setQuery(e.target.value)} /></label>
-        <label>Status<select value={filter} onChange={(e) => setFilter(e.target.value)}>
-          <option value="all">All attempts</option><option value="held">Held</option><option value="paid">Sold</option>
+        <label>{view === "referrals" ? "Search referral codes" : "Search by attendee, seat, reference, or referral code"}<input type="search" value={query} onChange={(e) => setQuery(e.target.value)} /></label>
+        {view === "attempts" && <label>Status<select value={filter} onChange={(e) => setFilter(e.target.value)}>
+          <option value="all">All payment attempts</option><option value="held">Pending / held</option>
+          <option value="failed">Declined</option><option value="canceled">Canceled</option><option value="expired">Expired</option>
           <option value="review">Needs review</option><option value="resolved">Resolved</option>
-        </select></label>
+        </select></label>}
       </div>
-      {shown?.length ? <div className="table-wrap" tabIndex={0} role="region" aria-label="Booking attempts"><table className="admin-table">
-        <caption>Booking attempts · {shown.length}</caption>
-        <thead><tr><th scope="col">Seat</th><th scope="col">Status</th><th scope="col">Updated (WAT)</th><th scope="col">Booking</th></tr></thead>
-        <tbody>{shown.map((record) => <tr key={record.ref}>
-          <td>{record.seat}</td><td><span className={`admin-state state-${record.resolution ? "resolved" : record.status}`}>{record.resolution ? "Resolved" : states[record.status]}</span></td>
-          <td>{localTime(record.updatedAt)}</td>
-          <td><button className="text-button" aria-label={`View seat ${record.seat}, ${record.resolution ? "resolved" : states[record.status]}, updated ${localTime(record.updatedAt)}`}
-            disabled={busy} onClick={(e) => { returnFocus.current = e.currentTarget; void run(() => loadDetail(record.ref)); }}>View</button></td>
-        </tr>)}</tbody>
-      </table></div> : <p role="status">{snapshot.records.length ? "No attempts match this search." : "No booking attempts yet."}</p>}
+      {view === "referrals" ? (referrals?.length ? <div className="table-wrap" tabIndex={0} role="region" aria-label="Paid referral counts"><table className="referral-table">
+        <caption>Successful paid bookings per code · {referrals.length} codes</caption>
+        <thead><tr><th scope="col">Referral code</th><th scope="col">Paid bookings</th></tr></thead>
+        <tbody>{referrals.map(row => <tr key={row.code}><td><code>{row.code}</code></td><td>{row.paidBookings}</td></tr>)}</tbody>
+      </table></div> : <p role="status">No referral codes match this search.</p>) : shown?.length ?
+        <div className="table-wrap" tabIndex={0} role="region" aria-label={view === "confirmed" ? "Confirmed paid bookings" : "Payment attempts"}><table className="admin-table">
+          <caption>{view === "confirmed" ? "Confirmed paid bookings" : "Payment attempts"} · {shown.length}</caption>
+          <thead><tr>{view === "confirmed" && <th scope="col">Attendee</th>}<th scope="col">Seat</th>
+            {view === "attempts" && <th scope="col">Status</th>}<th scope="col">Referral code</th><th scope="col">Updated (WAT)</th><th scope="col">Booking</th></tr></thead>
+          <tbody>{shown.map((record) => <tr key={record.ref}>
+            {view === "confirmed" && <td>{record.name}</td>}<td>{record.seat}</td>
+            {view === "attempts" && <td><span className={`admin-state state-${record.resolution ? "resolved" : record.status}`}>{record.resolution ? "Resolved" : states[record.status]}</span></td>}
+            <td>{record.referralCode ? <code>{record.referralCode}</code> : "No code"}</td><td>{localTime(record.updatedAt)}</td>
+            <td><button className="text-button" aria-label={`View seat ${record.seat}, ${record.resolution ? "resolved" : states[record.status]}, updated ${localTime(record.updatedAt)}`}
+              disabled={busy} onClick={(e) => { returnFocus.current = e.currentTarget; void run(() => loadDetail(record.ref)); }}>View</button></td>
+          </tr>)}</tbody>
+        </table></div> : <p role="status">{query || filter !== "all" ? "No bookings match this search." : view === "confirmed" ? "No confirmed paid bookings yet." : "No payment attempts need troubleshooting."}</p>}
     </>}
   </section></EventShell>;
 }
@@ -193,6 +220,7 @@ function BookingDetail({ record, mode, busy, close, release, resolve }: {
     <dl>
       <div><dt>Attendee</dt><dd>{record.name}</dd></div>
       <div><dt>Email</dt><dd>{record.email}</dd></div>
+      <div><dt>Referral code</dt><dd>{record.referralCode || "Not used"}</dd></div>
       <div><dt>Payment reference</dt><dd>{record.ref}</dd></div>
       <div><dt>Last updated</dt><dd>{localTime(record.updatedAt)} WAT</dd></div>
       {record.ticketId && <div><dt>Ticket ID</dt><dd>{record.ticketId}</dd></div>}

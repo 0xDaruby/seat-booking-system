@@ -20,6 +20,12 @@ export default function SeatBooking() {
   const [checkoutPaused, setCheckoutPaused] = useState(false);
   const [recovery, setRecovery] = useState(false);
   const [seatError, setSeatError] = useState(false);
+  const [referralError, setReferralError] = useState("");
+  const [validating, setValidating] = useState(false);
+  const referralInput = useRef<HTMLInputElement>(null);
+  const reviewing = useRef(false);
+  const reviewRequest = useRef<AbortController | null>(null);
+  const mounted = useRef(false);
   const map = useRef<HTMLFieldSetElement>(null);
   const loading = useRef(false);
   const navigate = useNavigate();
@@ -52,12 +58,17 @@ export default function SeatBooking() {
     void loadSeats();
   }, []);
 
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; reviewRequest.current?.abort(); };
+  }, []);
+
   function focusSeats() {
     const group = map.current;
     (group?.querySelector<HTMLInputElement>("input:not(:disabled)") ?? group)?.focus();
   }
 
-  function review(e: FormEvent<HTMLFormElement>) {
+  async function review(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!inventory || loadingError || recovery || checkoutPaused) return;
     if (!selected) {
@@ -65,7 +76,32 @@ export default function SeatBooking() {
       focusSeats();
       return;
     }
-    navigate("/payment?review=1");
+    if (reviewing.current) return;
+    reviewing.current = true;
+    setValidating(true);
+    setReferralError("");
+    const controller = new AbortController();
+    reviewRequest.current = controller;
+    const timeout = window.setTimeout(() => controller.abort(), 15_000);
+    try {
+      if (draft.referralCode.trim()) {
+        const result = await api<{ referralCode: string }>("referral/validate", { referralCode: draft.referralCode }, controller.signal);
+        if (!mounted.current || controller.signal.aborted) return;
+        draft.update({ referralCode: result.referralCode });
+      }
+      if (!mounted.current) return;
+      navigate("/payment?review=1");
+    } catch (error) {
+      if (!mounted.current) return;
+      setReferralError(controller.signal.aborted ? "The referral code check timed out. Try again or leave it blank." :
+        error instanceof Error ? error.message : "The referral code could not be checked. Try again or leave it blank.");
+      referralInput.current?.focus();
+    } finally {
+      window.clearTimeout(timeout);
+      reviewRequest.current = null;
+      reviewing.current = false;
+      if (mounted.current) setValidating(false);
+    }
   }
 
   return <EventShell booking>
@@ -138,13 +174,21 @@ export default function SeatBooking() {
           <label>Email address<input required type="email" autoComplete="email" name="email" maxLength={254}
             placeholder="you@example.com" value={draft.email}
             onChange={(e) => draft.update({ email: e.target.value })} /></label>
+          <label className="referral-field">Referral code <span className="muted">Optional</span>
+            <input ref={referralInput} name="referralCode" autoComplete="off" autoCapitalize="characters" spellCheck={false}
+              maxLength={32} placeholder="Code from your ambassador" value={draft.referralCode} readOnly={validating}
+              aria-invalid={Boolean(referralError)} aria-describedby={referralError ? "referral-help referral-error" : "referral-help"}
+              onChange={(e) => { draft.update({ referralCode: e.target.value.toUpperCase() }); setReferralError(""); }} />
+            <span id="referral-help" className="muted referral-help">An ambassador invited you? Enter their code here. You can also book without a code.</span>
+          </label>
+          {referralError && <p id="referral-error" className="error" role="alert">{referralError}</p>}
           <div className="order" aria-live="polite">
             <p className="eyebrow">Order summary</p>
             <p><strong>{event.edition} · 1 ticket</strong><span>{selected ? "Seat " + selected : "Choose a seat"}</span></p>
             <p className="total"><span>Total</span><strong>{price}</strong></p>
           </div>
-          <button className="button pay" disabled={!inventory || loadingError || recovery || checkoutPaused}>
-            {checkoutPaused ? "Reservations paused" : "Review booking"}<span aria-hidden="true">→</span>
+          <button className="button pay" disabled={!inventory || loadingError || recovery || checkoutPaused || validating}>
+            {checkoutPaused ? "Reservations paused" : validating ? "Checking referral code…" : "Review booking"}<span aria-hidden="true">→</span>
           </button>
         </section>
       </form>

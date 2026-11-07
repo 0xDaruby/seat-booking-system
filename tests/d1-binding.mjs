@@ -1,8 +1,9 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { openD1Inventory } from "../server/d1-inventory.mjs";
 
-const migration = readFileSync(new URL("../migrations/0001_inventory.sql", import.meta.url), "utf8");
+const migration = readdirSync(new URL("../migrations/", import.meta.url)).filter(name => name.endsWith(".sql")).sort()
+  .map(name => readFileSync(new URL("../migrations/" + name, import.meta.url), "utf8")).join("\n");
 
 // Execute the exact adapter SQL and batch boundaries without cloud resources.
 export function localBinding(t) {
