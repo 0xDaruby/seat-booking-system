@@ -1,0 +1,119 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "series-004-local",
+  "account_id": "6beb17d940b589d4fcba7fc5fcf0005e",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-01-15",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "workers_dev": false,
+  "preview_urls": false,
+  "assets": {
+    "directory": "./dist/worker-assets",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": [
+      "/api",
+      "/api/*"
+    ]
+  },
+  "dev": {
+    "ip": "127.0.0.1",
+    "port": 8791
+  },
+  "vars": {
+    "BOOKING_MODE": "preview",
+    "BOOKING_ORIGIN": "http://127.0.0.1:8791"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "series-004-local",
+      "database_id": "00000000-0000-0000-0000-000000000001"
+    }
+  ],
+  "env": {
+    "staging": {
+      "name": "series-004-staging",
+      "workers_dev": true,
+      "preview_urls": false,
+      "ratelimits": [
+        {
+          "name": "API_RATE",
+          "namespace_id": "504001",
+          "simple": {
+            "limit": 180,
+            "period": 60
+          }
+        },
+        {
+          "name": "CHECKOUT_RATE",
+          "namespace_id": "504002",
+          "simple": {
+            "limit": 15,
+            "period": 60
+          }
+        }
+      ],
+      "vars": {
+        "BOOKING_MODE": "test",
+        "BOOKING_ORIGIN": "https://series-004-staging.edaraiquaibom16.workers.dev"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "series-004-staging",
+          "database_id": "10398fa5-b8f5-4e68-938d-51c87a046cb0"
+        }
+      ],
+      "triggers": {
+        "crons": [
+          "* * * * *"
+        ]
+      }
+    },
+    "production": {
+      "name": "series-004",
+      "workers_dev": true,
+      "preview_urls": false,
+      "ratelimits": [
+        {
+          "name": "API_RATE",
+          "namespace_id": "504003",
+          "simple": {
+            "limit": 180,
+            "period": 60
+          }
+        },
+        {
+          "name": "CHECKOUT_RATE",
+          "namespace_id": "504004",
+          "simple": {
+            "limit": 15,
+            "period": 60
+          }
+        }
+      ],
+      "vars": {
+        "BOOKING_MODE": "live",
+        "BOOKING_ORIGIN": "https://series-004.edaraiquaibom16.workers.dev",
+        "BOOKING_PAYSTACK_CHANNELS": "card,bank_transfer",
+        "BOOKING_ENABLE_LIVE_MODE": "1",
+        "BOOKING_CHECKOUT_PAUSED": "0"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "series-004-production",
+          "database_id": "84c43b82-77f9-44cb-8eb1-3054b66d193c"
+        }
+      ],
+      "triggers": {
+        "crons": [
+          "* * * * *"
+        ]
+      }
+    }
+  }
+}

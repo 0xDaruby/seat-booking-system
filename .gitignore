@@ -12,6 +12,7 @@ dist
 dist-ssr
 *.local
 .env
+.env.*
 
 # Editor directories and files
 .vscode/*
@@ -26,3 +27,9 @@ dist-ssr
 branch_structure.json
 temp_auto_push.bat
 temp_interactive_push.bat
+
+.booking-data/
+.dev.vars*
+.wrangler/
+.worker-check/
+wrangler-*.log
