@@ -8,7 +8,11 @@ export default function EventShell({ children, booking = false }: { children: Re
     <header className="masthead">
       <div className="wrap masthead-inner">
         <Link className="wordmark" to="/" aria-label={event.name + " home"}>
-          <span aria-hidden="true">&amp;</span><strong>{event.name}</strong>
+          <span className="brand-my" aria-hidden="true">My</span>
+          <span className="brand-stack" aria-hidden="true">
+            <span className="brand-highs">Highs</span>
+            <span className="brand-ending"><span className="brand-amp">&amp;</span><span>I</span></span>
+          </span>
         </Link>
         {booking ? <a href="#booking">Book a seat <span aria-hidden="true">↗</span></a> : <Link to="/">Event home</Link>}
       </div>
