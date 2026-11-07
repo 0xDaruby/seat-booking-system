@@ -18,6 +18,7 @@ export default function EventShell({ children, booking = false }: { children: Re
       <span>{event.name} · {event.edition}</span>
       <a href={`mailto:${event.supportEmail}`}>Organizer support: {event.supportEmail}</a>
       <span>Useful. Rare. Irreplaceable.</span>
+      <a href="https://oxdaruby.tech/">Built by 0xdaruby</a>
     </footer>
   </>;
 }
