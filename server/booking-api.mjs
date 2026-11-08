@@ -144,6 +144,8 @@ export function createBookingApi({ origin, mode, gateway, inventory, accounts = 
           seats: await inventory.availability(), preview: mode === "preview",
           checkoutPaused: forcePause || await inventory.isPaused(),
           recovery: Boolean(attempt && (payable.includes(attempt.status) || terminal.includes(attempt.status))),
+          canBookAnother: attempt?.status === "paid",
+          hasTickets: Boolean(session && (await inventory.tickets(session)).length),
         });
       }
       if (route === "/api/referral/validate" && post) {
@@ -152,7 +154,10 @@ export function createBookingApi({ origin, mode, gateway, inventory, accounts = 
       }
       if (route === "/api/checkout" && post) {
         if (!session) return deny(headers, 409, "Reload seat availability and try again.");
-        const { seat, requestId } = data;
+        const { seat, requestId, afterTicket } = data;
+        if (afterTicket !== undefined && (typeof afterTicket !== "string" || !/^S004-[A-F0-9-]{36}$/.test(afterTicket))) {
+          return deny(headers, 400, "Invalid previous ticket.");
+        }
         const name = typeof data.name === "string" ? data.name.trim() : "";
         const email = typeof data.email === "string" ? data.email.trim() : "";
         let referralCode;
@@ -164,7 +169,7 @@ export function createBookingApi({ origin, mode, gateway, inventory, accounts = 
           return deny(headers, 400, "Enter a valid name and email address and choose a seat.");
         }
         if (!await allowCheckout(Date.now())) return deny(headers, 429, "Too many attempts. Please try again shortly.");
-        const { created, existing, paused } = await inventory.claim({ session, seat, name, email, mode, requestId, forcePause, referralCode });
+        const { created, existing, paused } = await inventory.claim({ session, seat, name, email, mode, requestId, forcePause, referralCode, afterTicket });
         if (paused) return deny(headers, 423, "New reservations are paused. Please check back later.");
         if (existing) {
           const result = publicBooking(existing);
@@ -206,13 +211,17 @@ export function createBookingApi({ origin, mode, gateway, inventory, accounts = 
         }
         return json(headers, 200, { booking: publicBooking(attempt) });
       }
+      if (route === "/api/tickets" && !post) {
+        return json(headers, 200, { tickets: session ? await inventory.tickets(session) : [] });
+      }
       if (route === "/api/ticket" && !post) {
-        const attempt = await latest();
+        const tickets = session ? await inventory.tickets(session) : [];
         const requestedId = searchParams.get("id");
-        if (attempt?.status !== "paid" || (requestedId !== null && requestedId !== attempt.ticketId)) {
+        const ticket = requestedId === null ? tickets[0] : tickets.find(ticket => ticket.id === requestedId);
+        if (!ticket) {
           return deny(headers, 404, "No confirmed ticket for this session.");
         }
-        return json(headers, 200, { ticket: publicBooking(attempt).ticket });
+        return json(headers, 200, { ticket });
       }
       if (route === "/api/simulate" && post && !gateway) {
         const attempt = await latest();

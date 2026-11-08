@@ -118,6 +118,9 @@ button:disabled { cursor: not-allowed; opacity: .62; }
 .ticket-background { display: block; width: 100%; height: 100%; }
 .ticket-lettering { position: absolute; inset: 0; width: 100%; height: 100%; }
 .ticket-summary { margin-top: 16px; overflow-wrap: anywhere; }
+.ticket-picker { margin-top: 24px; }
+.ticket-picker .actions { margin-block: 10px; }
+.ticket-picker [aria-current="page"] { border-color: var(--lime); color: var(--lime); }
 .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 130px), 1fr)); gap: 12px; margin-top: 20px; }
 .metrics div { padding: 14px; border: 1px solid var(--divider); }
 .metrics dd { font: bold 2rem var(--serif); }

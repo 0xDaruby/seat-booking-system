@@ -22,7 +22,7 @@ export function openInventory(path) {
       CHECK (status IN ('initializing','pending','paid','failed','canceled','expired','exception'))
     );
     CREATE UNIQUE INDEX IF NOT EXISTS seat_allocation ON attempts(seat) WHERE status IN ${active};
-    CREATE UNIQUE INDEX IF NOT EXISTS session_allocation ON attempts(session) WHERE status IN ${active};
+    CREATE UNIQUE INDEX IF NOT EXISTS session_allocation ON attempts(session) WHERE status IN ('initializing','pending');
     CREATE TABLE IF NOT EXISTS booking_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS organizer_sessions (
       id TEXT PRIMARY KEY, actor TEXT NOT NULL, credential TEXT NOT NULL, expiresAt INTEGER NOT NULL
@@ -53,13 +53,16 @@ export function openInventory(path) {
   if (db.prepare("SELECT value FROM booking_settings WHERE key='referral_code_format'").get()?.value !== "MHI04") {
     migrate("0003_referral_code_format.sql");
   }
+  if (db.prepare("SELECT sql FROM sqlite_master WHERE name='session_allocation'").get()?.sql.includes("'paid'")) {
+    migrate("0004_repeat_bookings.sql");
+  }
   db.exec("CREATE INDEX IF NOT EXISTS attempts_by_session ON attempts(session, updatedAt DESC)");
   db.exec("CREATE INDEX IF NOT EXISTS attempts_by_check ON attempts(nextCheck)");
 
   const latest = db.prepare(`
     SELECT a.*, r.ref IS NOT NULL AS resolved
     FROM attempts a LEFT JOIN payment_resolutions r ON r.ref=a.ref WHERE a.session=?
-    ORDER BY CASE WHEN a.status IN ${active} THEN 0 WHEN a.status='exception' THEN 1 ELSE 2 END, a.rowid DESC LIMIT 1
+    ORDER BY CASE WHEN a.status IN ('initializing','pending') THEN 0 WHEN a.status='exception' THEN 1 ELSE 2 END, a.rowid DESC LIMIT 1
   `);
   const get = db.prepare("SELECT * FROM attempts WHERE ref = ?");
   const insert = db.prepare(`
@@ -107,17 +110,20 @@ export function openInventory(path) {
       });
     },
     latest: (session) => latest.get(session),
+    tickets: (session) => db.prepare("SELECT ticketId AS id,name,seat FROM attempts WHERE session=? AND status='paid' AND ticketId IS NOT NULL ORDER BY rowid DESC").all(session),
     get: (ref) => get.get(ref),
-    claim({ session, seat, name, email, mode, requestId, forcePause = false, referralCode }, now = Date.now()) {
+    claim({ session, seat, name, email, mode, requestId, forcePause = false, referralCode, afterTicket }, now = Date.now()) {
       referralCode = normalizeReferralCode(referralCode);
       const ref = "s004-" + createHash("sha256").update(session + ":" + requestId).digest("hex").slice(0, 32);
       return transaction(() => {
         const existing = latest.get(session);
-        if (existing && ["initializing", "pending", "paid", "exception"].includes(existing.status)) {
+        if (existing && ["initializing", "pending", "exception"].includes(existing.status)) {
           return { existing };
         }
         const replay = get.get(ref);
         if (replay) return { existing: replay };
+        const paid = db.prepare("SELECT ticketId FROM attempts WHERE session=? AND status='paid'").all(session);
+        if (paid.length && !paid.some(row => row.ticketId === afterTicket)) return { existing };
         if (forcePause || isPaused()) return { paused: true };
         const { changes } = insert.run(ref, session, seat, name, email, event.priceKobo, event.currency, mode, now + holdMs, now + 30_000, now, referralCode);
         return changes ? { created: get.get(ref) } : {};

@@ -1,23 +1,28 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import EventShell from "../components/EventShell";
 import TicketArtwork from "../components/TicketArtwork";
+import BookAnotherSeat from "../components/BookAnotherSeat";
 import { api } from "../booking";
 import type { Booking } from "../booking";
 
 export default function Ticket() {
-  const [ticket, setTicket] = useState<Booking["ticket"]>();
+  const [tickets, setTickets] = useState<NonNullable<Booking["ticket"]>[]>([]);
+  const [params] = useSearchParams();
+  const requestedId = params.get("id");
+  const [exportTicket, setExportTicket] = useState<Booking["ticket"]>();
+  const ticket = exportTicket ?? (requestedId ? tickets.find(ticket => ticket.id === requestedId) : tickets[0]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [exporting, setExporting] = useState(false);
+  const exporting = Boolean(exportTicket);
   const artwork = useRef<HTMLElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
     let active = true;
     heading.current?.focus();
-    api<{ ticket: Booking["ticket"] }>("ticket").then((data) => {
-      if (active) setTicket(data.ticket);
+    api<{ tickets: NonNullable<Booking["ticket"]>[] }>("tickets").then((data) => {
+      if (active) setTickets(data.tickets);
     }).catch(() => {
       if (active) setError("We couldn’t open a confirmed ticket for this booking session.");
     }).finally(() => {
@@ -28,7 +33,7 @@ export default function Ticket() {
 
   async function download(format: "PNG" | "PDF") {
     if (!artwork.current || !ticket || exporting) return;
-    setExporting(true);
+    setExportTicket(ticket);
     setError("");
     try {
       const { default: html2canvas } = await import("html2canvas");
@@ -76,7 +81,7 @@ export default function Ticket() {
     } catch {
       setError("The download failed. Please try again.");
     } finally {
-      setExporting(false);
+      setExportTicket(undefined);
     }
   }
 
@@ -86,15 +91,28 @@ export default function Ticket() {
       <h1 ref={heading} tabIndex={-1}>{ticket ? "Your ticket." : "Ticket confirmation."}</h1>
       {loading && <p role="status">Loading your ticket…</p>}
       {error && <p className="error" role="alert">{error}</p>}
+      {tickets.length > 1 && <nav className="ticket-picker" aria-label="Your confirmed tickets">
+        <p className="muted">Your tickets · {tickets.length} confirmed seats</p>
+        <div className="actions">{tickets.map(item => <Link className="outline" key={item.id}
+          aria-disabled={exporting || undefined} onClick={e => { if (exporting) e.preventDefault(); }}
+          aria-current={item.id === ticket?.id ? "page" : undefined} to={`/ticket?id=${encodeURIComponent(item.id)}`}>
+          Seat {item.seat}
+        </Link>)}</div>
+      </nav>}
       {ticket ? <>
         <TicketArtwork ticket={ticket} ref={artwork} />
         <p className="ticket-summary">{ticket.name} · Seat {ticket.seat}</p>
         <div className="actions">
           <button className="button" disabled={exporting} onClick={() => download("PNG")}>Download PNG</button>
           <button className="outline" disabled={exporting} onClick={() => download("PDF")}>Download PDF</button>
+          <BookAnotherSeat ticketId={ticket.id} disabled={exporting} />
         </div>
         {exporting && <p role="status">Preparing your download…</p>}
-      </> : !loading && <Link className="outline" to="/payment">Check payment</Link>}
+        <p className="muted">Another seat requires a separate payment. Your confirmed tickets stay available in this browser.</p>
+      </> : !loading && <>
+        <p>No confirmed ticket found{requestedId ? " for this link" : " in this browser"}.</p>
+        <Link className="outline" to="/payment">Check payment</Link>
+      </>}
     </section>
   </EventShell>;
 }

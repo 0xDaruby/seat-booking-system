@@ -1,10 +1,9 @@
 import { event, holdMs, latePaymentReviewMs } from "./event.mjs";
 import { normalizeReferralCode } from "./referrals.mjs";
 
-const active = "('initializing','pending','paid')";
 const holds = "('initializing','pending')";
 const closed = "('expired','failed','canceled')";
-const recoverable = "('initializing','pending','paid','exception')";
+const recoverable = "('initializing','pending','exception')";
 const modes = ["preview", "test", "live"];
 const firstRow = (result) => result.results[0];
 const changed = (result) => result.meta.changes > 0;
@@ -24,7 +23,7 @@ export function openD1Inventory(db) {
   const bySession = (session) => query(`
     SELECT a.*, r.ref IS NOT NULL AS resolved
     FROM attempts a LEFT JOIN payment_resolutions r ON r.ref=a.ref WHERE a.session=?
-    ORDER BY CASE WHEN a.status IN ${active} THEN 0 WHEN a.status='exception' THEN 1 ELSE 2 END,
+    ORDER BY CASE WHEN a.status IN ${holds} THEN 0 WHEN a.status='exception' THEN 1 ELSE 2 END,
       a.rowid DESC LIMIT 1
   `, session);
   const setting = (key) => query("SELECT value FROM booking_settings WHERE key=?", key);
@@ -60,8 +59,11 @@ export function openD1Inventory(db) {
       }
     },
     latest: (session) => bySession(session).first(),
+    async tickets(session) {
+      return (await query("SELECT ticketId AS id,name,seat FROM attempts WHERE session=? AND status='paid' AND ticketId IS NOT NULL ORDER BY rowid DESC", session).all()).results;
+    },
     get,
-    async claim({ session, seat, name, email, mode, requestId, forcePause = false, referralCode }, now = Date.now()) {
+    async claim({ session, seat, name, email, mode, requestId, forcePause = false, referralCode, afterTicket }, now = Date.now()) {
       referralCode = normalizeReferralCode(referralCode);
       const ref = "s004-" + (await hash(session + ":" + requestId)).slice(0, 32);
       const [inserted, latest, replay, pause] = await db.batch([
@@ -70,9 +72,12 @@ export function openD1Inventory(db) {
           WHERE ?=0 AND ${pauseCheck}='0'
           AND EXISTS (SELECT 1 FROM booking_settings WHERE key='mode' AND value=?)
           AND NOT EXISTS (SELECT 1 FROM attempts WHERE session=? AND status IN ${recoverable})
+          AND (NOT EXISTS (SELECT 1 FROM attempts WHERE session=? AND status='paid')
+            OR EXISTS (SELECT 1 FROM attempts WHERE session=? AND status='paid' AND ticketId=?))
+          AND NOT EXISTS (SELECT 1 FROM attempts WHERE ref=?)
           ON CONFLICT DO NOTHING`,
         ref, session, seat, name, email, event.priceKobo, event.currency, mode,
-        now + holdMs, now + 30_000, now, referralCode, Number(forcePause), mode, session),
+        now + holdMs, now + 30_000, now, referralCode, Number(forcePause), mode, session, session, session, afterTicket ?? null, ref),
         bySession(session),
         byRef(ref),
         pauseValue(),

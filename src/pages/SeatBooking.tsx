@@ -19,6 +19,9 @@ export default function SeatBooking() {
   const [preview, setPreview] = useState(false);
   const [checkoutPaused, setCheckoutPaused] = useState(false);
   const [recovery, setRecovery] = useState(false);
+  const [hasTickets, setHasTickets] = useState(false);
+  const [canBookAnother, setCanBookAnother] = useState(false);
+  const mustRecover = recovery && !(canBookAnother && draft.afterTicket);
   const [seatError, setSeatError] = useState(false);
   const [referralError, setReferralError] = useState("");
   const [validating, setValidating] = useState(false);
@@ -36,7 +39,7 @@ export default function SeatBooking() {
     if (loading.current) return;
     loading.current = true;
     try {
-      const result = await api<{ seats: Inventory; preview: boolean; recovery: boolean; checkoutPaused: boolean }>("seats");
+      const result = await api<{ seats: Inventory; preview: boolean; recovery: boolean; checkoutPaused: boolean; hasTickets: boolean; canBookAnother: boolean }>("seats");
       if (result.preview && !isLoopback()) {
         setInventory(undefined);
         setLoadingError(true);
@@ -45,6 +48,8 @@ export default function SeatBooking() {
       setInventory(result.seats);
       setPreview(result.preview);
       setRecovery(result.recovery);
+      setHasTickets(result.hasTickets);
+      setCanBookAnother(result.canBookAnother);
       setCheckoutPaused(result.checkoutPaused);
       setLoadingError(false);
     } catch {
@@ -70,7 +75,7 @@ export default function SeatBooking() {
 
   async function review(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!inventory || loadingError || recovery || checkoutPaused) return;
+    if (!inventory || loadingError || mustRecover || checkoutPaused) return;
     if (!selected) {
       setSeatError(true);
       focusSeats();
@@ -131,7 +136,8 @@ export default function SeatBooking() {
       </div>
       {preview && <p className="preview-banner">Local preview · No money will be charged.</p>}
       {checkoutPaused && <p className="preview-banner" role="status">New reservations are paused. You can still <Link to="/payment">check an existing booking</Link>.</p>}
-      {recovery && <p className="preview-banner">You have a booking in this browser. <Link to="/payment">Check your booking</Link></p>}
+      {mustRecover && <p className="preview-banner">You have a booking in this browser. <Link to="/payment">Check your booking</Link></p>}
+      {hasTickets && <p className="preview-banner"><Link to="/ticket">View your confirmed tickets</Link>. {draft.afterTicket ? "Choose a new seat and review the attendee details for a separate payment." : "To buy another seat, open your ticket and choose Book another seat."}</p>}
       <form className="booking-grid" onSubmit={review}>
         <section className="panel">
           <h3><span className="step">01</span> Choose a seat</h3>
@@ -187,7 +193,7 @@ export default function SeatBooking() {
             <p><strong>{event.edition} · 1 ticket</strong><span>{selected ? "Seat " + selected : "Choose a seat"}</span></p>
             <p className="total"><span>Total</span><strong>{price}</strong></p>
           </div>
-          <button className="button pay" disabled={!inventory || loadingError || recovery || checkoutPaused || validating}>
+          <button className="button pay" disabled={!inventory || loadingError || mustRecover || checkoutPaused || validating}>
             {checkoutPaused ? "Reservations paused" : validating ? "Checking referral code…" : "Review booking"}<span aria-hidden="true">→</span>
           </button>
         </section>

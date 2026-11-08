@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import EventShell from "../components/EventShell";
+import BookAnotherSeat from "../components/BookAnotherSeat";
 import { api, ApiError, event, isLoopback, openCheckout, price } from "../booking";
 import type { Booking, Inventory } from "../booking";
 import { useStore } from "../store/useStore";
@@ -29,7 +30,7 @@ export default function Payment() {
 }
 
 function PaymentReview() {
-  const { name, email, seat, referralCode, getRequestId } = useStore();
+  const { name, email, seat, referralCode, getRequestId, afterTicket } = useStore();
   const navigate = useNavigate();
   const heading = useRef<HTMLHeadingElement>(null);
   const submitting = useRef(false);
@@ -54,18 +55,18 @@ function PaymentReview() {
     let checkoutRequested = false;
     try {
       const availability = await api<{
-        seats: Inventory; preview: boolean; checkoutPaused: boolean; recovery: boolean;
+        seats: Inventory; preview: boolean; checkoutPaused: boolean; recovery: boolean; canBookAnother: boolean;
       }>("seats", undefined, AbortSignal.timeout(verifyTimeout));
       if (!mounted.current) return;
       if (availability.preview && !isLoopback()) throw new Error("Checkout is temporarily unavailable.");
-      if (availability.recovery) {
+      if (availability.recovery && !(availability.canBookAnother && afterTicket)) {
         navigate("/payment?recover=1", { replace: true });
         return;
       }
       if (availability.checkoutPaused) throw new Error("New reservations are paused. Please check back later.");
       if (availability.seats[seat]) throw new ApiError("That seat is unavailable. Choose another seat to continue.", 409);
       checkoutRequested = true;
-      const result = await api<Booking>("checkout", { name, email, seat, referralCode, requestId: getRequestId() }, AbortSignal.timeout(verifyTimeout));
+      const result = await api<Booking>("checkout", { name, email, seat, referralCode, afterTicket, requestId: getRequestId() }, AbortSignal.timeout(verifyTimeout));
       if (!mounted.current) return;
       if (result.checkoutUrl) openCheckout(result.checkoutUrl);
       else navigate("/payment?recover=1", { replace: true });
@@ -209,7 +210,10 @@ function PaymentStatus({ returned, recovering, reference }: { returned: boolean;
         </p>}
         {checkoutUrl && <p className="muted">Resume only if you haven’t paid. If you’ve paid, check your payment here.</p>}
         <div className="actions">
-          {booking?.status === "paid" && <Link className="button" to="/ticket">View your ticket →</Link>}
+          {booking?.status === "paid" && booking.ticket && <>
+            <Link className="button" to={`/ticket?id=${encodeURIComponent(booking.ticket.id)}`}>View your ticket →</Link>
+            <BookAnotherSeat ticketId={booking.ticket.id} />
+          </>}
           {(pending || verifyError || (returned && !booking) || (manualCheck && inProgress)) && <button className="button" type="button"
             disabled={inProgress} onClick={() => setManualCheck({ resume: false })}>Check payment</button>}
           {checkoutUrl && <button className="outline" type="button" disabled={inProgress || verifyError}
