@@ -4,8 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 127.0.0.1",
-    "build": "tsc -b && vite build --outDir dist/worker-assets",
+    "dev": "node init && vite --host 127.0.0.1",
+    "build": "node init && tsc -b && vite build --outDir dist/worker-assets",
     "lint": "eslint .",
     "preview": "vite preview --outDir dist/worker-assets"
   },
